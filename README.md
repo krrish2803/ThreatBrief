@@ -1,64 +1,198 @@
 # ThreatBrief
 
-AI-powered security incident briefing system. Connects to Splunk Enterprise, pulls SIEM alerts, runs them through a 5-agent LangGraph pipeline powered by NVIDIA NIM, and generates structured incident briefs with MITRE ATT&CK mapping, IOC extraction, attack timelines, confidence scoring, and AI-written executive summaries.
+AI-powered security incident briefing system. Connects to Splunk Enterprise, pulls SIEM alerts, runs them through a 5-agent LangGraph pipeline powered by NVIDIA NIM (Llama 3.1 70B), and generates structured incident briefs with MITRE ATT&CK mapping, IOC extraction, attack timelines, confidence scoring, and AI-written executive summaries.
 
-## Quick Start
+![Architecture](https://img.shields.io/badge/backend-FastAPI-009688?logo=fastapi)
+![Frontend](https://img.shields.io/badge/frontend-React-61DAFB?logo=react)
+![LLM](https://img.shields.io/badge/LLM-NVIDIA_NIM-76B900?logo=nvidia)
+![SIEM](https://img.shields.io/badge/SIEM-Splunk-000000?logo=splunk)
 
-1. **Install Splunk Enterprise** from [splunk.com/download](https://www.splunk.com/download) (macOS .dmg)
+## Features
 
-2. **Start Splunk:**
-   ```bash
-   cd /Applications/Splunk/bin && ./splunk start
-   ```
+- **3 Built-in Attack Scenarios**: Brute Force (48 alerts), Lateral Movement (11 alerts), Ransomware (117 alerts)
+- **5-Agent AI Pipeline**: Ingestor → Triager → Enricher → Analyst → Writer
+- **MITRE ATT&CK Mapping**: Automatic technique identification and mapping
+- **IOC Extraction**: Pulls IPs, domains, hashes, usernames from alerts
+- **Timeline Reconstruction**: Chronological attack timeline with significance ratings
+- **Confidence Scoring**: AI-evaluated confidence with reasoning
+- **Ask The Brief**: Chat with the brief using natural language questions
+- **Live Splunk Integration**: Pull real alerts from your Splunk instance
+- **SSE Streaming**: Real-time pipeline progress via Server-Sent Events
 
-3. **Configure HEC:**
-   - Open Splunk web at `localhost:8000`, login as admin
-   - Settings → Data Inputs → HTTP Event Collector → Global Settings → Enable HEC
-   - Create new HEC token: Settings → Data Inputs → HTTP Event Collector → New Token
-   - Name: `threatbrief`, allowed index: `main`
-   - Copy token into `.env` as `SPLUNK_HEC_TOKEN`
+## Quick Start (Local)
 
-4. **Set up environment:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your NVIDIA NIM API key and Splunk credentials
-   ```
+### Prerequisites
 
-5. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+- Python 3.9+
+- Node.js 18+
+- NVIDIA NIM API key (free from [build.nvidia.com](https://build.nvidia.com))
+- (Optional) Splunk Enterprise for live mode
 
-6. **Start the backend:**
-   ```bash
-   uvicorn backend.main:app --reload --port 8000
-   ```
+### 1. Clone and Set Up Environment
 
-7. **Start the frontend:**
-   ```bash
-   cd frontend && npm install && npm run dev
-   ```
+```bash
+git clone https://github.com/krrish2803/ThreatBrief.git
+cd ThreatBrief
+cp .env.example .env
+```
 
-8. Open `http://localhost:5173` in your browser.
+Edit `.env` with your credentials:
 
-## Demo Flow
+```env
+NVIDIA_NIM_API_KEY=nvapi-your-key-here
 
-1. App loads with three scenario buttons visible immediately
-2. Click "Ransomware Indicators" to start a pipeline
-3. Pipeline stepper animates across: Ingestor → Triager → Enricher → Analyst → Writer
-4. Incident brief populates with severity badge, executive summary, technical details, and actions
-5. MITRE ATT&CK badges and IOC table fill the right panel
-6. Confidence score ring animates to its value
-7. Type questions in "Ask The Brief" to get AI answers about the incident
-8. Toggle "Use Live Splunk" to pull real events from your local Splunk instance
+# Splunk (optional - mock data works without it)
+SPLUNK_HOST=localhost
+SPLUNK_PORT=8089
+SPLUNK_HEC_PORT=8088
+SPLUNK_USERNAME=admin
+SPLUNK_PASSWORD=your_password
+SPLUNK_INDEX=main
+SPLUNK_HEC_TOKEN=your-hec-token
+```
+
+### 2. Install Backend Dependencies
+
+```bash
+# Use a virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+If you get an "externally-managed-environment" error:
+
+```bash
+pip install --break-system-packages -r requirements.txt
+```
+
+### 3. Start the Backend
+
+```bash
+uvicorn backend.main:app --reload --port 8000
+```
+
+Verify it's running:
+
+```bash
+curl http://localhost:8000/api/health
+# {"status":"ok","service":"ThreatBrief"}
+```
+
+### 4. Install and Start the Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 5. Open the App
+
+Navigate to **http://localhost:5173** in your browser.
+
+## Testing the App
+
+### Without Splunk (Recommended First Run)
+
+1. The app loads with 3 scenario buttons: **Brute Force**, **Lateral Movement**, **Ransomware**
+2. Click any scenario button to start the pipeline
+3. Watch the pipeline stepper animate: Ingestor → Triager → Enricher → Analyst → Writer
+4. After ~30-60 seconds, the incident brief populates with:
+   - Executive summary and severity badge
+   - Affected systems list
+   - Recommended actions
+   - MITRE ATT&CK techniques (right panel)
+   - Indicators of Compromise (right panel)
+   - Attack timeline (right panel)
+   - Confidence score ring (right panel)
+5. Type questions in "Ask The Brief" to get AI answers about the incident
+
+### With Live Splunk
+
+1. Start Splunk: `/Applications/Splunk/bin/splunk start`
+2. Enable HEC on port 8088 in Splunk settings
+3. Ensure `.env` has your Splunk credentials and HEC token
+4. Toggle **"Use Live Splunk"** on in the app
+5. Click **"Fetch & Analyze"** — pulls alerts from Splunk and runs the pipeline
+
+### Injecting Mock Data into Splunk
+
+To test the live Splunk flow with data:
+
+```bash
+curl -X POST "http://localhost:8000/api/splunk/inject?scenario_id=lateral-movement"
+```
+
+This injects 11 lateral movement alerts into your Splunk `main` index. Then toggle Splunk on and click **"Fetch & Analyze"**.
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/health` | Health check |
+| GET | `/api/scenarios` | List mock scenarios |
+| POST | `/api/scenarios/{id}/run` | Run a mock scenario |
+| POST | `/api/analyze` | Analyze custom alerts |
+| GET | `/api/stream/{job_id}` | SSE stream for pipeline progress |
+| POST | `/api/brief/{job_id}/ask` | Ask a question about the brief |
+| GET | `/api/splunk/alerts` | Fetch alerts from Splunk |
+| POST | `/api/splunk/inject?scenario_id={id}` | Inject mock alerts into Splunk |
+
+## Project Structure
+
+```
+threatbrief/
+├── backend/
+│   ├── main.py              # FastAPI server + SSE routes
+│   ├── pipeline.py          # LangGraph StateGraph pipeline
+│   ├── nim_client.py        # NVIDIA NIM API client
+│   ├── splunk_client.py     # Splunk REST API + HEC client
+│   ├── mock_data.py         # 3 attack scenarios (48/11/117 alerts)
+│   ├── models.py            # Pydantic models
+│   └── agents/
+│       ├── ingestor.py      # Alert validation & normalization
+│       ├── triager.py       # AI severity triage & classification
+│       ├── enricher.py      # MITRE ATT&CK mapping & IOC extraction
+│       ├── analyst.py       # Timeline & blast radius analysis
+│       └── writer.py        # Executive summary & brief compilation
+├── frontend/
+│   ├── index.html
+│   ├── vite.config.js
+│   ├── tailwind.config.js
+│   ├── postcss.config.js
+│   ├── package.json
+│   └── src/
+│       ├── main.jsx
+│       ├── App.jsx
+│       ├── config.js          # API URL (VITE_API_URL)
+│       ├── index.css
+│       └── components/
+│           ├── AlertInput.jsx      # Scenario buttons & Splunk toggle
+│           ├── PipelineStatus.jsx   # Agent progress stepper
+│           ├── IncidentBrief.jsx    # Executive summary & details
+│           ├── MitreBadges.jsx      # MITRE ATT&CK technique badges
+│           ├── Timeline.jsx         # Attack timeline
+│           ├── IOCTable.jsx         # Indicators of Compromise
+│           ├── ConfidenceScore.jsx  # Animated confidence ring
+│           └── AskTheBrief.jsx      # Q&A chat interface
+├── .env.example
+├── .gitignore
+├── requirements.txt
+├── render.yaml
+└── README.md
+```
 
 ## Architecture
 
-- **Backend**: Python, FastAPI (port 8000), LangGraph, NVIDIA NIM API
-- **LLM**: NVIDIA NIM — `meta/llama-3.1-70b-instruct` via OpenAI-compatible SDK
-- **SIEM**: Splunk Enterprise REST API (localhost:8089), HEC (localhost:8088)
-- **Frontend**: React + Tailwind CSS, Vite dev server (port 5173)
-- **Streaming**: Server-Sent Events (SSE)
+| Component | Technology |
+|-----------|------------|
+| Backend | Python, FastAPI (port 8000) |
+| LLM | NVIDIA NIM — `meta/llama-3.1-70b-instruct` |
+| SIEM | Splunk Enterprise REST API (8089), HEC (8088) |
+| Frontend | React 18 + Tailwind CSS, Vite (port 5173) |
+| Streaming | Server-Sent Events (SSE) |
+| Pipeline | LangGraph StateGraph (synchronous, thread-based) |
 
 ### Pipeline Agents
 
@@ -70,38 +204,31 @@ AI-powered security incident briefing system. Connects to Splunk Enterprise, pul
 | **Analyst** | Chronological timeline reconstruction and blast radius assessment |
 | **Writer** | Executive summary generation and final brief compilation |
 
-## Project Structure
+## Troubleshooting
 
+### Backend won't start (port in use)
+```bash
+kill -9 $(lsof -ti:8000)
+uvicorn backend.main:app --reload --port 8000
 ```
-threatbrief/
-├── backend/
-│   ├── main.py              # FastAPI server + SSE routes
-│   ├── nim_client.py        # NVIDIA NIM client
-│   ├── splunk_client.py     # Splunk REST API client
-│   ├── pipeline.py          # LangGraph StateGraph pipeline
-│   ├── mock_data.py         # 3 attack scenarios
-│   ├── models.py            # Pydantic models
-│   └── agents/
-│       ├── ingestor.py
-│       ├── triager.py
-│       ├── enricher.py
-│       ├── analyst.py
-│       └── writer.py
-├── frontend/
-│   ├── index.html
-│   └── src/
-│       ├── App.jsx
-│       ├── main.jsx
-│       └── components/
-│           ├── AlertInput.jsx
-│           ├── PipelineStatus.jsx
-│           ├── IncidentBrief.jsx
-│           ├── MitreBadges.jsx
-│           ├── Timeline.jsx
-│           ├── IOCTable.jsx
-│           ├── ConfidenceScore.jsx
-│           └── AskTheBrief.jsx
-├── .env
-├── requirements.txt
-└── README.md
+
+### "externally-managed-environment" error
+```bash
+pip install --break-system-packages -r requirements.txt
 ```
+
+### NIM API is slow
+Each agent makes an LLM call (~20-30s). Full pipeline for 11 alerts takes ~30-60s. For 117 alerts (ransomware), expect 2-3 minutes.
+
+### Frontend can't reach backend
+Ensure `VITE_API_URL` is set correctly in `frontend/src/config.js` or as an environment variable. Default: `http://localhost:8000`
+
+### Splunk connection fails
+- Verify Splunk is running: `/Applications/Splunk/bin/splunk status`
+- Verify credentials in `.env`
+- If password was changed, update `.env`
+- Splunk must be reachable from the machine running the backend
+
+## License
+
+MIT
