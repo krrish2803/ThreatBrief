@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: threatbrief-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: NVIDIA_NIM_API_KEY
+        sync: false
+      - key: SPLUNK_HOST
+        value: host.docker.internal
+      - key: SPLUNK_PORT
+        value: "8089"
+      - key: SPLUNK_HEC_PORT
+        value: "8088"
+      - key: SPLUNK_USERNAME
+        value: admin
+      - key: SPLUNK_PASSWORD
+        sync: false
+      - key: SPLUNK_INDEX
+        value: main
+      - key: SPLUNK_HEC_TOKEN
+        sync: false
