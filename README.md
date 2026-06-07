@@ -229,6 +229,47 @@ Ensure `VITE_API_URL` is set correctly in `frontend/src/config.js` or as an envi
 - If password was changed, update `.env`
 - Splunk must be reachable from the machine running the backend
 
+## Deployment
+
+### Vercel (Frontend) — Mock Scenarios Only
+
+The frontend is deployed at **https://threat-brief-six.vercel.app**.
+
+**Note:** The deployed version supports the 3 built-in mock scenarios (Brute Force, Lateral Movement, Ransomware) which work fully. **Live Splunk mode will not work** on Vercel because the Render backend cannot reach your local Splunk instance (`localhost:8089`).
+
+To configure on Vercel:
+- **Root Directory:** `frontend`
+- **Framework:** Vite (auto-detected)
+- **Build Command:** `npm run build` (default)
+- **Env Variable:** `VITE_API_URL` = your backend URL (or `http://localhost:8000` for local dev)
+
+### Render (Backend)
+
+The backend API is deployed at **https://threatbrief-kmsz.onrender.com**.
+
+**Note:** The backend can fetch Splunk alerts only when running locally alongside Splunk. On Render, it uses mock data via the scenario endpoints.
+
+To configure on Render:
+- **Root Directory:** *(leave empty — repo root)*
+- **Runtime:** Python
+- **Build Command:** `pip install --break-system-packages -r requirements.txt`
+- **Start Command:** `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+- **Env Variables:** `NVIDIA_NIM_API_KEY`, `SPLUNK_HOST`, `SPLUNK_PORT`, `SPLUNK_USERNAME`, `SPLUNK_PASSWORD`, `SPLUNK_HEC_TOKEN`
+
+### Splunk — Local Only
+
+Splunk integration only works when running the backend locally on the same machine as Splunk:
+
+```bash
+# Terminal 1: Backend
+uvicorn backend.main:app --reload --port 8000
+
+# Terminal 2: Frontend
+cd frontend && npm run dev
+```
+
+Then open `http://localhost:5173`, toggle **Use Live Splunk** on, and click **Fetch & Analyze**.
+
 ## License
 
 MIT
