@@ -81,7 +81,7 @@ export default function App() {
     setCurrentAgent('ingestor')
     setScenarioName(fromSplunk ? 'Live Splunk Analysis' : 'Custom Alert Analysis')
     try {
-      const res = await fetch('${API_URL}/api/analyze', {
+      const res = await fetch(`${API_URL}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ alerts, splunk_mode: fromSplunk }),
